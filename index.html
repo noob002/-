@@ -44,14 +44,15 @@ const counter = document.getElementById("counter");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const floor = canvas.height - 30;
-const gravity = 0.6;
+let floor = canvas.height - 30;
+let gravity = 0.6;
 
 let dots = [];
 let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 
 let exploded50 = false;
 let exploded100 = false;
+let gravityReversed = false;
 
 let spawnInterval = 1200;
 
@@ -59,6 +60,7 @@ let spawnInterval = 1200;
 window.addEventListener("resize", () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  floor = canvas.height - 30;
 });
 
 window.addEventListener("mousemove", e => {
@@ -81,7 +83,8 @@ function createDot() {
     vx: (Math.random() - 0.5) * 4,
     vy: Math.random() * -2,
     r: 4,
-    mode: "follow"
+    mode: "follow",
+    followSpeed: Math.random() * 0.04 + 0.01 // ✅ 점마다 다른 추적 속도
   };
 }
 
@@ -91,6 +94,12 @@ function addDot() {
 
   if (dots.length >= 50 && !exploded50) explode50();
   if (dots.length >= 100 && !exploded100) explode100();
+
+  // ✅ 200개에서 중력 반전
+  if (dots.length >= 200 && !gravityReversed) {
+    gravityReversed = true;
+    gravity *= -1;
+  }
 
   if (dots.length >= 100 && spawnInterval > 200) {
     spawnInterval -= 50;
@@ -163,19 +172,38 @@ function update() {
 
   dots.forEach(d => {
     if (d.mode === "follow" && !exploded50) {
-      d.x += (mouse.x - d.x) * 0.05;
-      d.y += (mouse.y - d.y) * 0.05;
+      d.x += (mouse.x - d.x) * d.followSpeed;
+      d.y += (mouse.y - d.y) * d.followSpeed;
     } else {
       d.vy += gravity;
       d.x += d.vx;
       d.y += d.vy;
 
-      if (d.y + d.r >= floor) {
+      // ✅ 바닥 충돌
+      if (!gravityReversed && d.y + d.r >= floor) {
         d.y = floor - d.r;
         d.vy *= -0.5;
-        d.vx *= 0.98;
+      }
+
+      // ✅ 천장 충돌 (중력 반전 시)
+      if (gravityReversed && d.y - d.r <= 0) {
+        d.y = d.r;
+        d.vy *= -0.5;
+      }
+
+      // ✅ 마우스 밀림
+      const dx = d.x - mouse.x;
+      const dy = d.y - mouse.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 30) {
+        const force = (30 - dist) * 0.4;
+        d.vx += (dx / dist) * force;
+        d.vy += (dy / dist) * force;
       }
     }
+
+    // ✅ 화면 밖 차단
+    d.x = Math.max(d.r, Math.min(canvas.width - d.r, d.x));
 
     ctx.beginPath();
     ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
