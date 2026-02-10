@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>그냥 정말 쓸모없는 점</title>
+  <title>점이 감당 안 됩니다</title>
   <style>
     body {
       margin: 0;
@@ -34,53 +34,49 @@
   <div id="text">점이 늘어납니다. 이유는 없습니다.</div>
 
   <script>
-    /* =====================
-       🔒 우클릭 / F12 차단
-    ====================== */
+    /* 🔒 우클릭 / 개발자도구 차단 */
     document.addEventListener("contextmenu", e => e.preventDefault());
-
     document.addEventListener("keydown", e => {
       if (
         e.key === "F12" ||
         (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key)) ||
         (e.ctrlKey && e.key === "U")
-      ) {
-        e.preventDefault();
-      }
+      ) e.preventDefault();
     });
 
-    /* =====================
-       점 로직
-    ====================== */
     const dots = [];
     const text = document.getElementById("text");
 
-    let mouseX = window.innerWidth / 2;
-    let mouseY = window.innerHeight / 2;
+    let mouseX = innerWidth / 2;
+    let mouseY = innerHeight / 2;
 
     let exploded50 = false;
     let exploded100 = false;
 
     const gravity = 0.6;
-    const floor = window.innerHeight - 10;
+    const floor = innerHeight - 10;
 
-    document.addEventListener("mousemove", (e) => {
+    let spawnDelay = 3000;
+    const minDelay = 200;
+    const acceleration = 0.93;
+
+    document.addEventListener("mousemove", e => {
       mouseX = e.clientX;
       mouseY = e.clientY;
     });
 
     function createDot() {
-      const dot = document.createElement("div");
-      dot.className = "dot";
+      const el = document.createElement("div");
+      el.className = "dot";
 
       const size = Math.random() * 6 + 6;
-      dot.style.width = size + "px";
-      dot.style.height = size + "px";
+      el.style.width = size + "px";
+      el.style.height = size + "px";
 
-      document.body.appendChild(dot);
+      document.body.appendChild(el);
 
       dots.push({
-        el: dot,
+        el,
         x: mouseX,
         y: mouseY,
         vx: (Math.random() - 0.5) * 10,
@@ -91,85 +87,110 @@
       });
     }
 
-    // 시작
-    createDot();
-
-    // 점 생성 루프
-    setInterval(() => {
-      createDot();
-
-      if (dots.length >= 50 && !exploded50) {
-        explode50();
-      }
-
-      if (dots.length >= 100 && !exploded100) {
-        explode100();
-      }
-    }, 3000);
-
     function explode50() {
       exploded50 = true;
       text.innerText = "점이 한 번 터졌습니다.";
 
-      dots.forEach(dot => {
-        dot.mode = "fall";
-        dot.vx = (Math.random() - 0.5) * 12;
-        dot.vy = Math.random() * -15;
+      dots.forEach(d => {
+        d.mode = "fall";
+        d.vx = (Math.random() - 0.5) * 12;
+        d.vy = Math.random() * -15;
       });
     }
 
     function explode100() {
       exploded100 = true;
-      text.innerText = "점이 다시 터졌습니다.";
+      text.innerText = "점이 바닥에서 다시 터졌습니다.";
 
-      dots.forEach(dot => {
-        dot.mode = "fall";
-        dot.vx = (Math.random() - 0.5) * 25;
-        dot.vy = Math.random() * -25;
+      dots.forEach(d => {
+        d.mode = "fall";
+        d.y = floor;
+        d.vx = (Math.random() - 0.5) * 30;
+        d.vy = Math.random() * -30 - 15; // 위로 강하게
       });
     }
 
-    // 텍스트 압박
-    setInterval(() => {
-      const count = dots.length;
+    function spawnLoop() {
+      createDot();
 
-      if (!exploded50) {
-        text.innerText = `점이 ${count}개 있습니다.`;
-      } else if (!exploded100) {
-        text.innerText = `점이 ${count}개 흩어졌습니다.`;
-      } else {
-        text.innerText = `점이 ${count}개인데 아직도 보고 있네요.`;
+      if (dots.length >= 50 && !exploded50) explode50();
+      if (dots.length >= 100 && !exploded100) explode100();
+
+      if (exploded100 && spawnDelay > minDelay) {
+        spawnDelay *= acceleration;
       }
-    }, 4000);
 
-    function animate() {
-      dots.forEach(dot => {
-        if (dot.mode === "follow") {
-          dot.x += (mouseX - dot.x) * dot.speed;
-          dot.y += (mouseY - dot.y) * dot.speed;
-        } else {
-          dot.vy += gravity;
-          dot.x += dot.vx;
-          dot.y += dot.vy;
+      setTimeout(spawnLoop, spawnDelay);
+    }
 
-          if (dot.y > floor) {
-            dot.y = floor;
-            dot.vy *= -0.4;
-            dot.vx *= 0.97;
-          }
+    /* 🔥 점 충돌 (대충 물리) */
+    function handleCollisions() {
+      for (let i = 0; i < dots.length; i++) {
+        for (let j = i + 1; j < dots.length; j++) {
+          const a = dots[i];
+          const b = dots[j];
+          if (a.mode !== "fall" || b.mode !== "fall") continue;
 
-          if (dot.x < 0 || dot.x > window.innerWidth) {
-            dot.vx *= -1;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = (a.size + b.size) / 2;
+
+          if (dist < minDist) {
+            const angle = Math.atan2(dy, dx);
+            const overlap = (minDist - dist) / 2;
+
+            const ox = Math.cos(angle) * overlap;
+            const oy = Math.sin(angle) * overlap;
+
+            a.x -= ox; a.y -= oy;
+            b.x += ox; b.y += oy;
+
+            [a.vx, b.vx] = [b.vx * 0.9, a.vx * 0.9];
+            [a.vy, b.vy] = [b.vy * 0.9, a.vy * 0.9];
           }
         }
+      }
+    }
 
-        dot.el.style.left = dot.x + "px";
-        dot.el.style.top = dot.y + "px";
+    function animate() {
+      dots.forEach(d => {
+        if (d.mode === "follow") {
+          d.x += (mouseX - d.x) * d.speed;
+          d.y += (mouseY - d.y) * d.speed;
+        } else {
+          d.vy += gravity;
+          d.x += d.vx;
+          d.y += d.vy;
+
+          if (d.y > floor) {
+            d.y = floor;
+            d.vy *= -0.4;
+            d.vx *= 0.97;
+          }
+
+          if (d.x < 0 || d.x > innerWidth) {
+            d.vx *= -1;
+          }
+        }
       });
+
+      if (exploded50) handleCollisions();
+
+      dots.forEach(d => {
+        d.el.style.left = d.x + "px";
+        d.el.style.top = d.y + "px";
+      });
+
+      if (exploded100) {
+        text.innerText = `점이 ${dots.length}개입니다. 이제 멈출 수 없습니다.`;
+      }
 
       requestAnimationFrame(animate);
     }
 
+    createDot();
+    spawnLoop();
     animate();
   </script>
 </body>
