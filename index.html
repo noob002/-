@@ -25,6 +25,7 @@ canvas {display:block;}
 <body>
 <canvas id="c"></canvas>
 <div id="counter">Dots: 0</div>
+
 <script>
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -38,11 +39,11 @@ let gravity = 0.6;
 let dots = [];
 let mouse = {x:canvas.width/2, y:canvas.height/2};
 
-let exploded50=false, exploded100=false, gravityReversed=false, zeroGravity=false, frozen=false;
+let exploded50=false, exploded100=false, gravityReversed=false, zeroGravity=false;
 let spawnInterval=1200;
-
 let explosion1000=false;
 let restore1300=false;
+let resting=false;
 
 window.addEventListener("resize",()=>{
   canvas.width = window.innerWidth;
@@ -77,7 +78,7 @@ function addDot(){
     gravityReversed=true; gravity*=-1;
   }
   if(dots.length>=500 && !zeroGravity){
-    zeroGravity=true; gravity=0; frozen=false;
+    zeroGravity=true; gravity=0; resting=false;
   }
   if(dots.length>=1000 && zeroGravity && !explosion1000){
     explosion1000=true;
@@ -129,11 +130,10 @@ function handleCollisions(){
         const angle=Math.atan2(dy,dx), push=(minDist-dist)/2;
         a.x+=Math.cos(angle)*push; a.y+=Math.sin(angle)*push;
         b.x-=Math.cos(angle)*push; b.y-=Math.sin(angle)*push;
-        if(!frozen){
-          const tx=a.vx, ty=a.vy;
-          a.vx=b.vx*0.6; a.vy=b.vy*0.6;
-          b.vx=tx*0.6; b.vy=ty*0.6;
-        }
+        // 충돌 시만 속도 약간 교환
+        const tx=a.vx, ty=a.vy;
+        a.vx=b.vx*0.3; a.vy=b.vy*0.3;
+        b.vx=tx*0.3; b.vy=ty*0.3;
       }
     }
   }
@@ -148,27 +148,24 @@ function update(){
     if(d.mode==="follow" && !exploded50){
       d.x+=(mouse.x-d.x)*d.followSpeed;
       d.y+=(mouse.y-d.y)*d.followSpeed;
-    }else if(!frozen){
-      if(!zeroGravity) d.vy+=gravity;
-      d.x+=d.vx; d.y+=d.vy;
+    } else {
+      // resting 상태에서 기본 중력/이동 제한
+      if(!resting || zeroGravity){
+        if(!zeroGravity) d.vy+=gravity;
+        d.x+=d.vx;
+        d.y+=d.vy;
+      }
 
       // 바닥/천장 충돌
-      if(!zeroGravity && !gravityReversed && d.y+d.r>=floor){
-        d.y=floor-d.r;
-        if(!frozen) d.vy=-Math.max(Math.abs(d.vy)*0.2,0.5);
-      }
-      if(!zeroGravity && gravityReversed && d.y-d.r<=0){
-        d.y=d.r;
-        if(!frozen) d.vy=Math.max(Math.abs(d.vy)*0.2,0.5);
-      }
-
-      // 우주 모드 바닥/천장 막기
-      if(zeroGravity){
+      if(!zeroGravity){
+        if(d.y+d.r>=floor){ d.y=floor-d.r; d.vy=-Math.max(Math.abs(d.vy)*0.2,0.5); }
+        if(d.y-d.r<=0){ d.y=d.r; d.vy=Math.max(Math.abs(d.vy)*0.2,0.5); }
+      } else { // 우주 모드 바닥/천장 막기
         if(d.y-d.r<=0){ d.y=d.r; d.vy=Math.abs(d.vy); }
         if(d.y+d.r>=canvas.height){ d.y=canvas.height-d.r; d.vy=-Math.abs(d.vy); }
       }
 
-      // 마우스 밀림
+      // 마우스 근처 밀림
       const dx=d.x-mouse.x, dy=d.y-mouse.y, dist=Math.hypot(dx,dy);
       if(dist<30){
         const force=(30-dist)*0.4;
@@ -177,8 +174,8 @@ function update(){
     }
 
     // 좌우 벽 충돌
-    if(d.x-d.r<=0){ d.x=d.r; if(!frozen)d.vx=Math.max(Math.abs(d.vx),1); }
-    if(d.x+d.r>=canvas.width){ d.x=canvas.width-d.r; if(!frozen)d.vx=-Math.max(Math.abs(d.vx),1); }
+    if(d.x-d.r<=0){ d.x=d.r; d.vx=Math.max(Math.abs(d.vx),1); }
+    if(d.x+d.r>=canvas.width){ d.x=canvas.width-d.r; d.vx=-Math.max(Math.abs(d.vx),1); }
 
     // 화면 밖 방지
     d.x=Math.max(d.r,Math.min(canvas.width-d.r,d.x));
@@ -190,7 +187,8 @@ function update(){
     ctx.fill();
   });
 
-  if(exploded50 && exploded100 && !frozen){ frozen=true; }
+  // 터지고 난 후 resting 모드
+  if(exploded50 && exploded100 && !resting){ resting=true; }
 
   requestAnimationFrame(update);
 }
