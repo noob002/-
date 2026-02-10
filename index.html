@@ -34,13 +34,33 @@
   <div id="text">점이 늘어납니다. 이유는 없습니다.</div>
 
   <script>
+    /* =====================
+       🔒 우클릭 / F12 차단
+    ====================== */
+    document.addEventListener("contextmenu", e => e.preventDefault());
+
+    document.addEventListener("keydown", e => {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key)) ||
+        (e.ctrlKey && e.key === "U")
+      ) {
+        e.preventDefault();
+      }
+    });
+
+    /* =====================
+       점 로직
+    ====================== */
     const dots = [];
     const text = document.getElementById("text");
 
     let mouseX = window.innerWidth / 2;
     let mouseY = window.innerHeight / 2;
 
-    let exploded = false;
+    let exploded50 = false;
+    let exploded100 = false;
+
     const gravity = 0.6;
     const floor = window.innerHeight - 10;
 
@@ -67,25 +87,29 @@
         vy: Math.random() * -10,
         speed: Math.random() * 0.08 + 0.02,
         size,
-        mode: exploded ? "fall" : "follow"
+        mode: exploded50 ? "fall" : "follow"
       });
     }
 
-    // 시작 점
+    // 시작
     createDot();
 
-    // 점 계속 생성
+    // 점 생성 루프
     setInterval(() => {
       createDot();
 
-      if (dots.length >= 50 && !exploded) {
-        explode();
+      if (dots.length >= 50 && !exploded50) {
+        explode50();
+      }
+
+      if (dots.length >= 100 && !exploded100) {
+        explode100();
       }
     }, 3000);
 
-    function explode() {
-      exploded = true;
-      text.innerText = "점이 터졌습니다.";
+    function explode50() {
+      exploded50 = true;
+      text.innerText = "점이 한 번 터졌습니다.";
 
       dots.forEach(dot => {
         dot.mode = "fall";
@@ -94,13 +118,27 @@
       });
     }
 
-    // 문구 압박
+    function explode100() {
+      exploded100 = true;
+      text.innerText = "점이 다시 터졌습니다.";
+
+      dots.forEach(dot => {
+        dot.mode = "fall";
+        dot.vx = (Math.random() - 0.5) * 25;
+        dot.vy = Math.random() * -25;
+      });
+    }
+
+    // 텍스트 압박
     setInterval(() => {
       const count = dots.length;
-      if (!exploded) {
+
+      if (!exploded50) {
         text.innerText = `점이 ${count}개 있습니다.`;
-      } else {
+      } else if (!exploded100) {
         text.innerText = `점이 ${count}개 흩어졌습니다.`;
+      } else {
+        text.innerText = `점이 ${count}개인데 아직도 보고 있네요.`;
       }
     }, 4000);
 
@@ -110,19 +148,16 @@
           dot.x += (mouseX - dot.x) * dot.speed;
           dot.y += (mouseY - dot.y) * dot.speed;
         } else {
-          // 중력 적용
           dot.vy += gravity;
           dot.x += dot.vx;
           dot.y += dot.vy;
 
-          // 바닥 충돌
           if (dot.y > floor) {
             dot.y = floor;
-            dot.vy *= -0.4; // 튕김
-            dot.vx *= 0.98; // 마찰
+            dot.vy *= -0.4;
+            dot.vx *= 0.97;
           }
 
-          // 벽 반사
           if (dot.x < 0 || dot.x > window.innerWidth) {
             dot.vx *= -1;
           }
