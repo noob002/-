@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>점이 늘어납니다</title>
+  <title>그냥 정말 쓸모없는 점</title>
   <style>
     body {
       margin: 0;
@@ -40,6 +40,10 @@
     let mouseX = window.innerWidth / 2;
     let mouseY = window.innerHeight / 2;
 
+    let exploded = false;
+    const gravity = 0.6;
+    const floor = window.innerHeight - 10;
+
     document.addEventListener("mousemove", (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
@@ -49,8 +53,7 @@
       const dot = document.createElement("div");
       dot.className = "dot";
 
-      // 3️⃣ 점 크기 랜덤
-      const size = Math.random() * 6 + 6; // 6~12px
+      const size = Math.random() * 6 + 6;
       dot.style.width = size + "px";
       dot.style.height = size + "px";
 
@@ -60,38 +63,75 @@
         el: dot,
         x: mouseX,
         y: mouseY,
-        speed: Math.random() * 0.08 + 0.02
+        vx: (Math.random() - 0.5) * 10,
+        vy: Math.random() * -10,
+        speed: Math.random() * 0.08 + 0.02,
+        size,
+        mode: exploded ? "fall" : "follow"
       });
     }
 
-    // 처음 점 하나
+    // 시작 점
     createDot();
 
-    // 점이 점점 늘어남 (3초마다)
-    setInterval(createDot, 3000);
+    // 점 계속 생성
+    setInterval(() => {
+      createDot();
 
-    // 1️⃣ 점 개수 표시 + 2️⃣ 개수에 따라 멘트 변화
+      if (dots.length >= 50 && !exploded) {
+        explode();
+      }
+    }, 3000);
+
+    function explode() {
+      exploded = true;
+      text.innerText = "점이 터졌습니다.";
+
+      dots.forEach(dot => {
+        dot.mode = "fall";
+        dot.vx = (Math.random() - 0.5) * 12;
+        dot.vy = Math.random() * -15;
+      });
+    }
+
+    // 문구 압박
     setInterval(() => {
       const count = dots.length;
-
-      if (count < 10) {
+      if (!exploded) {
         text.innerText = `점이 ${count}개 있습니다.`;
-      } else if (count < 20) {
-        text.innerText = `점이 ${count}개 있습니다. 조금 많지 않나요`;
-      } else if (count < 30) {
-        text.innerText = `점이 ${count}개 있습니다. 아직 보고 있네요`;
       } else {
-        text.innerText = `점이 ${count}개 있습니다. 이제 충분하지 않나요`;
+        text.innerText = `점이 ${count}개 흩어졌습니다.`;
       }
     }, 4000);
 
     function animate() {
       dots.forEach(dot => {
-        dot.x += (mouseX - dot.x) * dot.speed;
-        dot.y += (mouseY - dot.y) * dot.speed;
+        if (dot.mode === "follow") {
+          dot.x += (mouseX - dot.x) * dot.speed;
+          dot.y += (mouseY - dot.y) * dot.speed;
+        } else {
+          // 중력 적용
+          dot.vy += gravity;
+          dot.x += dot.vx;
+          dot.y += dot.vy;
+
+          // 바닥 충돌
+          if (dot.y > floor) {
+            dot.y = floor;
+            dot.vy *= -0.4; // 튕김
+            dot.vx *= 0.98; // 마찰
+          }
+
+          // 벽 반사
+          if (dot.x < 0 || dot.x > window.innerWidth) {
+            dot.vx *= -1;
+          }
+        }
+
         dot.el.style.left = dot.x + "px";
         dot.el.style.top = dot.y + "px";
       });
+
       requestAnimationFrame(animate);
     }
 
