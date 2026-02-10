@@ -53,6 +53,7 @@ let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let exploded50 = false;
 let exploded100 = false;
 let gravityReversed = false;
+let zeroGravity = false;
 
 let spawnInterval = 1200;
 
@@ -84,7 +85,7 @@ function createDot() {
     vy: Math.random() * -2,
     r: 4,
     mode: "follow",
-    followSpeed: Math.random() * 0.04 + 0.01 // ✅ 점마다 다른 추적 속도
+    followSpeed: Math.random() * 0.04 + 0.01
   };
 }
 
@@ -95,10 +96,16 @@ function addDot() {
   if (dots.length >= 50 && !exploded50) explode50();
   if (dots.length >= 100 && !exploded100) explode100();
 
-  // ✅ 200개에서 중력 반전
+  // 200개 → 중력 반전
   if (dots.length >= 200 && !gravityReversed) {
     gravityReversed = true;
     gravity *= -1;
+  }
+
+  // 500개 → 무중력
+  if (dots.length >= 500 && !zeroGravity) {
+    zeroGravity = true;
+    gravity = 0;
   }
 
   if (dots.length >= 100 && spawnInterval > 200) {
@@ -153,12 +160,12 @@ function handleCollisions() {
         b.x -= Math.cos(angle) * push;
         b.y -= Math.sin(angle) * push;
 
-        const tmpX = a.vx;
-        const tmpY = a.vy;
+        const tx = a.vx;
+        const ty = a.vy;
         a.vx = b.vx;
         a.vy = b.vy;
-        b.vx = tmpX;
-        b.vy = tmpY;
+        b.vx = tx;
+        b.vy = ty;
       }
     }
   }
@@ -167,7 +174,6 @@ function handleCollisions() {
 /* ===== 업데이트 ===== */
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   handleCollisions();
 
   dots.forEach(d => {
@@ -175,23 +181,24 @@ function update() {
       d.x += (mouse.x - d.x) * d.followSpeed;
       d.y += (mouse.y - d.y) * d.followSpeed;
     } else {
-      d.vy += gravity;
+      if (!zeroGravity) d.vy += gravity;
+
       d.x += d.vx;
       d.y += d.vy;
 
-      // ✅ 바닥 충돌
-      if (!gravityReversed && d.y + d.r >= floor) {
+      // 바닥
+      if (!zeroGravity && !gravityReversed && d.y + d.r >= floor) {
         d.y = floor - d.r;
-        d.vy *= -0.5;
+        d.vy = -Math.max(Math.abs(d.vy) * 0.6, 2);
       }
 
-      // ✅ 천장 충돌 (중력 반전 시)
-      if (gravityReversed && d.y - d.r <= 0) {
+      // 천장
+      if (!zeroGravity && gravityReversed && d.y - d.r <= 0) {
         d.y = d.r;
-        d.vy *= -0.5;
+        d.vy = Math.max(Math.abs(d.vy) * 0.6, 2);
       }
 
-      // ✅ 마우스 밀림
+      // 마우스 밀림
       const dx = d.x - mouse.x;
       const dy = d.y - mouse.y;
       const dist = Math.hypot(dx, dy);
@@ -202,8 +209,15 @@ function update() {
       }
     }
 
-    // ✅ 화면 밖 차단
-    d.x = Math.max(d.r, Math.min(canvas.width - d.r, d.x));
+    // 좌우 벽 충돌 (붙는 버그 해결)
+    if (d.x - d.r <= 0) {
+      d.x = d.r;
+      d.vx = Math.max(Math.abs(d.vx), 2);
+    }
+    if (d.x + d.r >= canvas.width) {
+      d.x = canvas.width - d.r;
+      d.vx = -Math.max(Math.abs(d.vx), 2);
+    }
 
     ctx.beginPath();
     ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
