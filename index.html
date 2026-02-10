@@ -1,42 +1,31 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>그냥 정말 쓸모없는 점</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background: #000;
-  }
-
-  canvas {
-    display: block;
-  }
-
-  #counter {
-    position: fixed;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: monospace;
-    font-size: 14px;
-    color: #fff;
-    background: rgba(0,0,0,0.6);
-    padding: 6px 14px;
-    border-radius: 20px;
-    z-index: 9999;
-    pointer-events: none;
-  }
+html, body {margin:0;padding:0;overflow:hidden;background:#000;}
+canvas {display:block;}
+#counter {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: monospace;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(0,0,0,0.6);
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 9999;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="counter">Dots: 0</div>
-
 <script>
-/* ===== 기본 설정 ===== */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const counter = document.getElementById("counter");
@@ -46,195 +35,169 @@ canvas.height = window.innerHeight;
 
 let floor = canvas.height - 30;
 let gravity = 0.6;
-
 let dots = [];
-let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+let mouse = {x:canvas.width/2, y:canvas.height/2};
 
-let exploded50 = false;
-let exploded100 = false;
-let gravityReversed = false;
-let zeroGravity = false;
+let exploded50=false, exploded100=false, gravityReversed=false, zeroGravity=false, frozen=false;
+let spawnInterval=1200;
 
-let spawnInterval = 1200;
+let explosion1000=false;
+let restore1300=false;
 
-/* ===== 이벤트 ===== */
-window.addEventListener("resize", () => {
+window.addEventListener("resize",()=>{
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  floor = canvas.height - 30;
+  floor = canvas.height-30;
+});
+window.addEventListener("mousemove",e=>{mouse.x=e.clientX; mouse.y=e.clientY;});
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{
+  if(e.key==="F12"||(e.ctrlKey&&e.shiftKey&&e.key==="I")) e.preventDefault();
 });
 
-window.addEventListener("mousemove", e => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
-});
-
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("keydown", e => {
-  if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === "I")) {
-    e.preventDefault();
-  }
-});
-
-/* ===== 점 생성 ===== */
-function createDot() {
+function createDot(){
   return {
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height / 2,
-    vx: (Math.random() - 0.5) * 4,
-    vy: Math.random() * -2,
+    x: Math.random()*canvas.width,
+    y: Math.random()*canvas.height/2,
+    vx: (Math.random()-0.5)*4,
+    vy: Math.random()*-2,
     r: 4,
-    mode: "follow",
-    followSpeed: Math.random() * 0.04 + 0.01
+    mode:"follow",
+    followSpeed: Math.random()*0.04+0.01
   };
 }
 
-function addDot() {
+function addDot(){
   dots.push(createDot());
   counter.innerText = `Dots: ${dots.length}`;
 
-  if (dots.length >= 50 && !exploded50) explode50();
-  if (dots.length >= 100 && !exploded100) explode100();
-
-  // 200개 → 중력 반전
-  if (dots.length >= 200 && !gravityReversed) {
-    gravityReversed = true;
-    gravity *= -1;
+  if(dots.length>=50 && !exploded50) explode50();
+  if(dots.length>=100 && !exploded100) explode100();
+  if(dots.length>=200 && !gravityReversed){
+    gravityReversed=true; gravity*=-1;
   }
-
-  // 500개 → 무중력
-  if (dots.length >= 500 && !zeroGravity) {
-    zeroGravity = true;
-    gravity = 0;
+  if(dots.length>=500 && !zeroGravity){
+    zeroGravity=true; gravity=0; frozen=false;
   }
-
-  if (dots.length >= 100 && spawnInterval > 200) {
-    spawnInterval -= 50;
-    restartSpawner();
+  if(dots.length>=1000 && zeroGravity && !explosion1000){
+    explosion1000=true;
+    dots.forEach(d=>{
+      d.vx=(Math.random()-0.5)*30;
+      d.vy=(Math.random()-0.5)*30;
+      d.mode="fall";
+    });
   }
+  if(dots.length>=1300 && zeroGravity && !restore1300){
+    restore1300=true;
+    zeroGravity=false;
+    gravity=0.6;
+    gravityReversed=false;
+  }
+  if(dots.length>=1500){ setTimeout(()=>{window.close();},500); }
+
+  if(dots.length>=100 && spawnInterval>200){ spawnInterval-=50; restartSpawner(); }
 }
 
 /* ===== 폭발 ===== */
-function explode50() {
-  exploded50 = true;
-
-  dots.forEach(d => {
-    const dx = d.x - mouse.x;
-    const dy = d.y - mouse.y;
-    const dist = Math.hypot(dx, dy) || 1;
-
-    d.vx = (dx / dist) * 20;
-    d.vy = (dy / dist) * 20;
-    d.mode = "fall";
+function explode50(){
+  exploded50=true;
+  dots.forEach(d=>{
+    const dx=d.x-mouse.x;
+    const dy=d.y-mouse.y;
+    const dist=Math.hypot(dx,dy)||1;
+    d.vx=(dx/dist)*20; d.vy=(dy/dist)*20; d.mode="fall";
   });
 }
-
-function explode100() {
-  exploded100 = true;
-
-  dots.forEach(d => {
-    d.y = floor;
-    d.vy = Math.random() * -30 - 15;
-    d.vx = (Math.random() - 0.5) * 30;
-    d.mode = "fall";
+function explode100(){
+  exploded100=true;
+  dots.forEach(d=>{
+    d.y=floor;
+    d.vy=Math.random()*-30-15;
+    d.vx=(Math.random()-0.5)*30;
+    d.mode="fall";
   });
 }
 
 /* ===== 점 충돌 ===== */
-function handleCollisions() {
-  for (let i = 0; i < dots.length; i++) {
-    for (let j = i + 1; j < dots.length; j++) {
-      const a = dots[i];
-      const b = dots[j];
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.hypot(dx, dy);
-      const minDist = a.r + b.r;
-
-      if (dist < minDist) {
-        const angle = Math.atan2(dy, dx);
-        const push = (minDist - dist) / 2;
-
-        a.x += Math.cos(angle) * push;
-        a.y += Math.sin(angle) * push;
-        b.x -= Math.cos(angle) * push;
-        b.y -= Math.sin(angle) * push;
-
-        const tx = a.vx;
-        const ty = a.vy;
-        a.vx = b.vx;
-        a.vy = b.vy;
-        b.vx = tx;
-        b.vy = ty;
+function handleCollisions(){
+  for(let i=0;i<dots.length;i++){
+    for(let j=i+1;j<dots.length;j++){
+      const a=dots[i], b=dots[j];
+      const dx=a.x-b.x, dy=a.y-b.y;
+      const dist=Math.hypot(dx,dy), minDist=a.r+b.r;
+      if(dist<minDist){
+        const angle=Math.atan2(dy,dx), push=(minDist-dist)/2;
+        a.x+=Math.cos(angle)*push; a.y+=Math.sin(angle)*push;
+        b.x-=Math.cos(angle)*push; b.y-=Math.sin(angle)*push;
+        if(!frozen){
+          const tx=a.vx, ty=a.vy;
+          a.vx=b.vx*0.6; a.vy=b.vy*0.6;
+          b.vx=tx*0.6; b.vy=ty*0.6;
+        }
       }
     }
   }
 }
 
 /* ===== 업데이트 ===== */
-function update() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function update(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   handleCollisions();
 
-  dots.forEach(d => {
-    if (d.mode === "follow" && !exploded50) {
-      d.x += (mouse.x - d.x) * d.followSpeed;
-      d.y += (mouse.y - d.y) * d.followSpeed;
-    } else {
-      if (!zeroGravity) d.vy += gravity;
+  dots.forEach(d=>{
+    if(d.mode==="follow" && !exploded50){
+      d.x+=(mouse.x-d.x)*d.followSpeed;
+      d.y+=(mouse.y-d.y)*d.followSpeed;
+    }else if(!frozen){
+      if(!zeroGravity) d.vy+=gravity;
+      d.x+=d.vx; d.y+=d.vy;
 
-      d.x += d.vx;
-      d.y += d.vy;
-
-      // 바닥
-      if (!zeroGravity && !gravityReversed && d.y + d.r >= floor) {
-        d.y = floor - d.r;
-        d.vy = -Math.max(Math.abs(d.vy) * 0.6, 2);
+      // 바닥/천장 충돌
+      if(!zeroGravity && !gravityReversed && d.y+d.r>=floor){
+        d.y=floor-d.r;
+        if(!frozen) d.vy=-Math.max(Math.abs(d.vy)*0.2,0.5);
+      }
+      if(!zeroGravity && gravityReversed && d.y-d.r<=0){
+        d.y=d.r;
+        if(!frozen) d.vy=Math.max(Math.abs(d.vy)*0.2,0.5);
       }
 
-      // 천장
-      if (!zeroGravity && gravityReversed && d.y - d.r <= 0) {
-        d.y = d.r;
-        d.vy = Math.max(Math.abs(d.vy) * 0.6, 2);
+      // 우주 모드 바닥/천장 막기
+      if(zeroGravity){
+        if(d.y-d.r<=0){ d.y=d.r; d.vy=Math.abs(d.vy); }
+        if(d.y+d.r>=canvas.height){ d.y=canvas.height-d.r; d.vy=-Math.abs(d.vy); }
       }
 
       // 마우스 밀림
-      const dx = d.x - mouse.x;
-      const dy = d.y - mouse.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 30) {
-        const force = (30 - dist) * 0.4;
-        d.vx += (dx / dist) * force;
-        d.vy += (dy / dist) * force;
+      const dx=d.x-mouse.x, dy=d.y-mouse.y, dist=Math.hypot(dx,dy);
+      if(dist<30){
+        const force=(30-dist)*0.4;
+        d.vx+=dx/dist*force; d.vy+=dy/dist*force;
       }
     }
 
-    // 좌우 벽 충돌 (붙는 버그 해결)
-    if (d.x - d.r <= 0) {
-      d.x = d.r;
-      d.vx = Math.max(Math.abs(d.vx), 2);
-    }
-    if (d.x + d.r >= canvas.width) {
-      d.x = canvas.width - d.r;
-      d.vx = -Math.max(Math.abs(d.vx), 2);
-    }
+    // 좌우 벽 충돌
+    if(d.x-d.r<=0){ d.x=d.r; if(!frozen)d.vx=Math.max(Math.abs(d.vx),1); }
+    if(d.x+d.r>=canvas.width){ d.x=canvas.width-d.r; if(!frozen)d.vx=-Math.max(Math.abs(d.vx),1); }
+
+    // 화면 밖 방지
+    d.x=Math.max(d.r,Math.min(canvas.width-d.r,d.x));
+    d.y=Math.max(d.r,Math.min(canvas.height-d.r,d.y));
 
     ctx.beginPath();
-    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
+    ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+    ctx.fillStyle="#fff";
     ctx.fill();
   });
+
+  if(exploded50 && exploded100 && !frozen){ frozen=true; }
 
   requestAnimationFrame(update);
 }
 
-/* ===== 점 생성 타이머 ===== */
+/* ===== 점 생성 ===== */
 let spawner;
-function restartSpawner() {
-  clearInterval(spawner);
-  spawner = setInterval(addDot, spawnInterval);
-}
-
+function restartSpawner(){ clearInterval(spawner); spawner=setInterval(addDot,spawnInterval); }
 restartSpawner();
 update();
 </script>
