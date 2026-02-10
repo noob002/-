@@ -2,24 +2,22 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>점</title>
+  <title>점이 늘어납니다</title>
   <style>
     body {
       margin: 0;
       height: 100vh;
-      background: #fff;
+      background: white;
       cursor: none;
+      overflow: hidden;
     }
 
-    #dot {
+    .dot {
       position: fixed;
-      width: 12px;
-      height: 12px;
       background: black;
       border-radius: 50%;
       pointer-events: none;
       transform: translate(-50%, -50%);
-      transition: transform 0.08s linear;
     }
 
     #text {
@@ -28,20 +26,76 @@
       right: 16px;
       font-size: 12px;
       color: #aaa;
+      user-select: none;
     }
   </style>
 </head>
 <body>
-  <div id="dot"></div>
-  <div id="text">점입니다. 따라옵니다.</div>
+  <div id="text">점이 늘어납니다. 이유는 없습니다.</div>
 
   <script>
-    const dot = document.getElementById("dot");
+    const dots = [];
+    const text = document.getElementById("text");
+
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
 
     document.addEventListener("mousemove", (e) => {
-      dot.style.left = e.clientX + "px";
-      dot.style.top = e.clientY + "px";
+      mouseX = e.clientX;
+      mouseY = e.clientY;
     });
+
+    function createDot() {
+      const dot = document.createElement("div");
+      dot.className = "dot";
+
+      // 3️⃣ 점 크기 랜덤
+      const size = Math.random() * 6 + 6; // 6~12px
+      dot.style.width = size + "px";
+      dot.style.height = size + "px";
+
+      document.body.appendChild(dot);
+
+      dots.push({
+        el: dot,
+        x: mouseX,
+        y: mouseY,
+        speed: Math.random() * 0.08 + 0.02
+      });
+    }
+
+    // 처음 점 하나
+    createDot();
+
+    // 점이 점점 늘어남 (3초마다)
+    setInterval(createDot, 3000);
+
+    // 1️⃣ 점 개수 표시 + 2️⃣ 개수에 따라 멘트 변화
+    setInterval(() => {
+      const count = dots.length;
+
+      if (count < 10) {
+        text.innerText = `점이 ${count}개 있습니다.`;
+      } else if (count < 20) {
+        text.innerText = `점이 ${count}개 있습니다. 조금 많지 않나요`;
+      } else if (count < 30) {
+        text.innerText = `점이 ${count}개 있습니다. 아직 보고 있네요`;
+      } else {
+        text.innerText = `점이 ${count}개 있습니다. 이제 충분하지 않나요`;
+      }
+    }, 4000);
+
+    function animate() {
+      dots.forEach(dot => {
+        dot.x += (mouseX - dot.x) * dot.speed;
+        dot.y += (mouseY - dot.y) * dot.speed;
+        dot.el.style.left = dot.x + "px";
+        dot.el.style.top = dot.y + "px";
+      });
+      requestAnimationFrame(animate);
+    }
+
+    animate();
   </script>
 </body>
 </html>
