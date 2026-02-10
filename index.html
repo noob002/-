@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>점</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #fff;
+      cursor: none;
+    }
+
+    #dot {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: black;
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s linear;
+    }
+
+    #text {
+      position: fixed;
+      bottom: 12px;
+      right: 16px;
+      font-size: 12px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div id="dot"></div>
+  <div id="text">점입니다. 따라옵니다.</div>
+
+  <script>
+    const dot = document.getElementById("dot");
+
+    document.addEventListener("mousemove", (e) => {
+      dot.style.left = e.clientX + "px";
+      dot.style.top = e.clientY + "px";
+    });
+  </script>
+</body>
+</html>
