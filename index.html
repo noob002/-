@@ -1,197 +1,200 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>그냥 정말 쓸모없는 점</title>
-  <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      background: white;
-      cursor: none;
-      overflow: hidden;
-    }
+<meta charset="UTF-8" />
+<title>그냥 정말 쓸모없는 점</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
 
-    .dot {
-      position: fixed;
-      background: black;
-      border-radius: 50%;
-      pointer-events: none;
-      transform: translate(-50%, -50%);
-    }
+  canvas {
+    display: block;
+  }
 
-    #text {
-      position: fixed;
-      bottom: 12px;
-      right: 16px;
-      font-size: 12px;
-      color: #aaa;
-      user-select: none;
-    }
-  </style>
+  #counter {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: monospace;
+    font-size: 14px;
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 14px;
+    border-radius: 20px;
+    z-index: 9999;
+    pointer-events: none;
+  }
+</style>
 </head>
 <body>
-  <div id="text">점이 늘어납니다. 이유는 없습니다.</div>
+<canvas id="c"></canvas>
+<div id="counter">Dots: 0</div>
 
-  <script>
-    /* 🔒 우클릭 / 개발자도구 차단 */
-    document.addEventListener("contextmenu", e => e.preventDefault());
-    document.addEventListener("keydown", e => {
-      if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key)) ||
-        (e.ctrlKey && e.key === "U")
-      ) e.preventDefault();
-    });
+<script>
+/* ===== 기본 설정 ===== */
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const counter = document.getElementById("counter");
 
-    const dots = [];
-    const text = document.getElementById("text");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-    let mouseX = innerWidth / 2;
-    let mouseY = innerHeight / 2;
+const floor = canvas.height - 30;
+const gravity = 0.6;
 
-    let exploded50 = false;
-    let exploded100 = false;
+let dots = [];
+let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 
-    const gravity = 0.6;
-    const floor = innerHeight - 10;
+let exploded50 = false;
+let exploded100 = false;
 
-    let spawnDelay = 3000;
-    const minDelay = 200;
-    const acceleration = 0.93;
+let spawnInterval = 1200;
 
-    document.addEventListener("mousemove", e => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
+/* ===== 이벤트 ===== */
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
 
-    function createDot() {
-      const el = document.createElement("div");
-      el.className = "dot";
+window.addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
 
-      const size = Math.random() * 6 + 6;
-      el.style.width = size + "px";
-      el.style.height = size + "px";
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("keydown", e => {
+  if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === "I")) {
+    e.preventDefault();
+  }
+});
 
-      document.body.appendChild(el);
+/* ===== 점 생성 ===== */
+function createDot() {
+  return {
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height / 2,
+    vx: (Math.random() - 0.5) * 4,
+    vy: Math.random() * -2,
+    r: 4,
+    mode: "follow"
+  };
+}
 
-      dots.push({
-        el,
-        x: mouseX,
-        y: mouseY,
-        vx: (Math.random() - 0.5) * 10,
-        vy: Math.random() * -10,
-        speed: Math.random() * 0.08 + 0.02,
-        size,
-        mode: exploded50 ? "fall" : "follow"
-      });
-    }
+function addDot() {
+  dots.push(createDot());
+  counter.innerText = `Dots: ${dots.length}`;
 
-    function explode50() {
-      exploded50 = true;
-      text.innerText = "점이 한 번 터졌습니다.";
+  if (dots.length >= 50 && !exploded50) explode50();
+  if (dots.length >= 100 && !exploded100) explode100();
 
-      dots.forEach(d => {
-        d.mode = "fall";
-        d.vx = (Math.random() - 0.5) * 12;
-        d.vy = Math.random() * -15;
-      });
-    }
+  if (dots.length >= 100 && spawnInterval > 200) {
+    spawnInterval -= 50;
+    restartSpawner();
+  }
+}
 
-    function explode100() {
-      exploded100 = true;
-      text.innerText = "점이 바닥에서 다시 터졌습니다.";
+/* ===== 폭발 ===== */
+function explode50() {
+  exploded50 = true;
 
-      dots.forEach(d => {
-        d.mode = "fall";
-        d.y = floor;
-        d.vx = (Math.random() - 0.5) * 30;
-        d.vy = Math.random() * -30 - 15; // 위로 강하게
-      });
-    }
+  dots.forEach(d => {
+    const dx = d.x - mouse.x;
+    const dy = d.y - mouse.y;
+    const dist = Math.hypot(dx, dy) || 1;
 
-    function spawnLoop() {
-      createDot();
+    d.vx = (dx / dist) * 20;
+    d.vy = (dy / dist) * 20;
+    d.mode = "fall";
+  });
+}
 
-      if (dots.length >= 50 && !exploded50) explode50();
-      if (dots.length >= 100 && !exploded100) explode100();
+function explode100() {
+  exploded100 = true;
 
-      if (exploded100 && spawnDelay > minDelay) {
-        spawnDelay *= acceleration;
+  dots.forEach(d => {
+    d.y = floor;
+    d.vy = Math.random() * -30 - 15;
+    d.vx = (Math.random() - 0.5) * 30;
+    d.mode = "fall";
+  });
+}
+
+/* ===== 점 충돌 ===== */
+function handleCollisions() {
+  for (let i = 0; i < dots.length; i++) {
+    for (let j = i + 1; j < dots.length; j++) {
+      const a = dots[i];
+      const b = dots[j];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = a.r + b.r;
+
+      if (dist < minDist) {
+        const angle = Math.atan2(dy, dx);
+        const push = (minDist - dist) / 2;
+
+        a.x += Math.cos(angle) * push;
+        a.y += Math.sin(angle) * push;
+        b.x -= Math.cos(angle) * push;
+        b.y -= Math.sin(angle) * push;
+
+        const tmpX = a.vx;
+        const tmpY = a.vy;
+        a.vx = b.vx;
+        a.vy = b.vy;
+        b.vx = tmpX;
+        b.vy = tmpY;
       }
-
-      setTimeout(spawnLoop, spawnDelay);
     }
+  }
+}
 
-    /* 🔥 점 충돌 (대충 물리) */
-    function handleCollisions() {
-      for (let i = 0; i < dots.length; i++) {
-        for (let j = i + 1; j < dots.length; j++) {
-          const a = dots[i];
-          const b = dots[j];
-          if (a.mode !== "fall" || b.mode !== "fall") continue;
+/* ===== 업데이트 ===== */
+function update() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const minDist = (a.size + b.size) / 2;
+  handleCollisions();
 
-          if (dist < minDist) {
-            const angle = Math.atan2(dy, dx);
-            const overlap = (minDist - dist) / 2;
+  dots.forEach(d => {
+    if (d.mode === "follow" && !exploded50) {
+      d.x += (mouse.x - d.x) * 0.05;
+      d.y += (mouse.y - d.y) * 0.05;
+    } else {
+      d.vy += gravity;
+      d.x += d.vx;
+      d.y += d.vy;
 
-            const ox = Math.cos(angle) * overlap;
-            const oy = Math.sin(angle) * overlap;
-
-            a.x -= ox; a.y -= oy;
-            b.x += ox; b.y += oy;
-
-            [a.vx, b.vx] = [b.vx * 0.9, a.vx * 0.9];
-            [a.vy, b.vy] = [b.vy * 0.9, a.vy * 0.9];
-          }
-        }
+      if (d.y + d.r >= floor) {
+        d.y = floor - d.r;
+        d.vy *= -0.5;
+        d.vx *= 0.98;
       }
     }
 
-    function animate() {
-      dots.forEach(d => {
-        if (d.mode === "follow") {
-          d.x += (mouseX - d.x) * d.speed;
-          d.y += (mouseY - d.y) * d.speed;
-        } else {
-          d.vy += gravity;
-          d.x += d.vx;
-          d.y += d.vy;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  });
 
-          if (d.y > floor) {
-            d.y = floor;
-            d.vy *= -0.4;
-            d.vx *= 0.97;
-          }
+  requestAnimationFrame(update);
+}
 
-          if (d.x < 0 || d.x > innerWidth) {
-            d.vx *= -1;
-          }
-        }
-      });
+/* ===== 점 생성 타이머 ===== */
+let spawner;
+function restartSpawner() {
+  clearInterval(spawner);
+  spawner = setInterval(addDot, spawnInterval);
+}
 
-      if (exploded50) handleCollisions();
-
-      dots.forEach(d => {
-        d.el.style.left = d.x + "px";
-        d.el.style.top = d.y + "px";
-      });
-
-      if (exploded100) {
-        text.innerText = `점이 ${dots.length}개입니다. 이제 멈출 수 없습니다.`;
-      }
-
-      requestAnimationFrame(animate);
-    }
-
-    createDot();
-    spawnLoop();
-    animate();
-  </script>
+restartSpawner();
+update();
+</script>
 </body>
 </html>
